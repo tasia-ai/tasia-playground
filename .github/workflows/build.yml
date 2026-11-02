@@ -101,7 +101,7 @@ jobs:
         run: cargo build --release --locked --target x86_64-apple-darwin -p aurora-viewer
       - name: Package app
         shell: bash
-        run: ./playground/scripts/package-macos-playground.sh x86_64-apple-darwin x64
+        run: bash ./playground/scripts/package-macos-playground.sh x86_64-apple-darwin x64
       - name: Upload package to storage.to
         env:
           STORAGE_TO_TOKEN: ${{ secrets.STORAGE_TO_TOKEN }}
@@ -137,7 +137,7 @@ jobs:
         run: cargo build --release --locked --target aarch64-apple-darwin -p aurora-viewer
       - name: Package app
         shell: bash
-        run: ./playground/scripts/package-macos-playground.sh aarch64-apple-darwin arm64
+        run: bash ./playground/scripts/package-macos-playground.sh aarch64-apple-darwin arm64
       - name: Upload package to storage.to
         env:
           STORAGE_TO_TOKEN: ${{ secrets.STORAGE_TO_TOKEN }}
