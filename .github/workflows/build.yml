@@ -20,6 +20,9 @@ jobs:
           path: source
       - name: Rust stable
         run: rustup update stable --no-self-update
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
       - name: Build
         working-directory: source
         run: cargo build --release --locked -p aurora-viewer
@@ -28,11 +31,15 @@ jobs:
         run: |
           ./source/scripts/package.ps1 -Exe source/target/release/tasia-viewer.exe -Out Tasia-Viewer-windows-x64 -Source source
           Compress-Archive -Path Tasia-Viewer-windows-x64 -DestinationPath Tasia-Viewer-windows-x64.zip
-      - uses: actions/upload-artifact@v7
-        with:
-          name: tasia-viewer-windows-x64
-          path: Tasia-Viewer-windows-x64.zip
-          if-no-files-found: error
+          $hash = (Get-FileHash -LiteralPath Tasia-Viewer-windows-x64.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  Tasia-Viewer-windows-x64.zip" | Set-Content -LiteralPath Tasia-Viewer-windows-x64.zip.sha256 -Encoding utf8NoBOM
+      - name: Upload package to storage.to
+        env:
+          STORAGE_TO_TOKEN: ${{ secrets.STORAGE_TO_TOKEN }}
+        run: |
+          python source/scripts/storage_to_upload.py --directory . --output storage-to-urls-windows.json
+          if ($LASTEXITCODE -ne 0) { throw 'storage.to upload failed' }
+          Get-Content storage-to-urls-windows.json | Add-Content $env:GITHUB_STEP_SUMMARY
 
   linux-x64:
     name: Linux x64
@@ -59,11 +66,13 @@ jobs:
         run: |
           ./source/scripts/package.ps1 -Exe source/target/release/tasia-viewer -Out Tasia-Viewer-linux-x64 -Source source
           tar -czf Tasia-Viewer-linux-x64.tar.gz Tasia-Viewer-linux-x64
-      - uses: actions/upload-artifact@v7
-        with:
-          name: tasia-viewer-linux-x64
-          path: Tasia-Viewer-linux-x64.tar.gz
-          if-no-files-found: error
+          sha256sum Tasia-Viewer-linux-x64.tar.gz > Tasia-Viewer-linux-x64.tar.gz.sha256
+      - name: Upload package to storage.to
+        env:
+          STORAGE_TO_TOKEN: ${{ secrets.STORAGE_TO_TOKEN }}
+        run: |
+          python3 source/scripts/storage_to_upload.py --directory . --output storage-to-urls-linux.json
+          cat storage-to-urls-linux.json >> "$GITHUB_STEP_SUMMARY"
 
   macos-x64:
     name: macOS x64
@@ -87,11 +96,13 @@ jobs:
       - name: Package app
         shell: bash
         run: ./scripts/package-macos-playground.sh x86_64-apple-darwin x64
-      - uses: actions/upload-artifact@v7
-        with:
-          name: tasia-viewer-macos-x64
-          path: Tasia-Viewer-macos-x64.zip
-          if-no-files-found: error
+      - name: Upload package to storage.to
+        env:
+          STORAGE_TO_TOKEN: ${{ secrets.STORAGE_TO_TOKEN }}
+        run: |
+          shasum -a 256 Tasia-Viewer-macos-x64.zip > Tasia-Viewer-macos-x64.zip.sha256
+          python3 source/scripts/storage_to_upload.py --directory . --output storage-to-urls-macos-x64.json
+          cat storage-to-urls-macos-x64.json >> "$GITHUB_STEP_SUMMARY"
 
   macos-arm64:
     name: macOS arm64
@@ -115,8 +126,10 @@ jobs:
       - name: Package app
         shell: bash
         run: ./scripts/package-macos-playground.sh aarch64-apple-darwin arm64
-      - uses: actions/upload-artifact@v7
-        with:
-          name: tasia-viewer-macos-arm64
-          path: Tasia-Viewer-macos-arm64.zip
-          if-no-files-found: error
+      - name: Upload package to storage.to
+        env:
+          STORAGE_TO_TOKEN: ${{ secrets.STORAGE_TO_TOKEN }}
+        run: |
+          shasum -a 256 Tasia-Viewer-macos-arm64.zip > Tasia-Viewer-macos-arm64.zip.sha256
+          python3 source/scripts/storage_to_upload.py --directory . --output storage-to-urls-macos-arm64.json
+          cat storage-to-urls-macos-arm64.json >> "$GITHUB_STEP_SUMMARY"
