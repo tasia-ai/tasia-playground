@@ -86,6 +86,12 @@ jobs:
           persist-credentials: false
           path: source
           fetch-depth: 0
+      - uses: actions/checkout@v7
+        with:
+          repository: tasia-ai/tasia-playground
+          ref: main
+          persist-credentials: false
+          path: playground
       - name: Rust stable and target
         run: rustup update stable --no-self-update && rustup target add x86_64-apple-darwin
       - name: Build
@@ -95,7 +101,7 @@ jobs:
         run: cargo build --release --locked --target x86_64-apple-darwin -p aurora-viewer
       - name: Package app
         shell: bash
-        run: ./scripts/package-macos-playground.sh x86_64-apple-darwin x64
+        run: ./playground/scripts/package-macos-playground.sh x86_64-apple-darwin x64
       - name: Upload package to storage.to
         env:
           STORAGE_TO_TOKEN: ${{ secrets.STORAGE_TO_TOKEN }}
@@ -116,6 +122,12 @@ jobs:
           persist-credentials: false
           path: source
           fetch-depth: 0
+      - uses: actions/checkout@v7
+        with:
+          repository: tasia-ai/tasia-playground
+          ref: main
+          persist-credentials: false
+          path: playground
       - name: Rust stable and target
         run: rustup update stable --no-self-update && rustup target add aarch64-apple-darwin
       - name: Build
@@ -125,7 +137,7 @@ jobs:
         run: cargo build --release --locked --target aarch64-apple-darwin -p aurora-viewer
       - name: Package app
         shell: bash
-        run: ./scripts/package-macos-playground.sh aarch64-apple-darwin arm64
+        run: ./playground/scripts/package-macos-playground.sh aarch64-apple-darwin arm64
       - name: Upload package to storage.to
         env:
           STORAGE_TO_TOKEN: ${{ secrets.STORAGE_TO_TOKEN }}
