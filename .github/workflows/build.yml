@@ -18,6 +18,12 @@ jobs:
           token: ${{ secrets.TASIA_SOURCE_READ_TOKEN }}
           persist-credentials: false
           path: source
+      - uses: actions/checkout@v7
+        with:
+          repository: tasia-ai/tasia-playground
+          ref: ${{ github.ref }}
+          persist-credentials: false
+          path: playground
       - name: Rust stable
         run: rustup update stable --no-self-update
       - uses: actions/setup-python@v6
@@ -33,13 +39,11 @@ jobs:
           Compress-Archive -Path Tasia-Viewer-windows-x64 -DestinationPath Tasia-Viewer-windows-x64.zip
           $hash = (Get-FileHash -LiteralPath Tasia-Viewer-windows-x64.zip -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  Tasia-Viewer-windows-x64.zip" | Set-Content -LiteralPath Tasia-Viewer-windows-x64.zip.sha256 -Encoding utf8NoBOM
-      - name: Upload package to storage.to
-        env:
-          STORAGE_TO_TOKEN: ${{ secrets.STORAGE_TO_TOKEN }}
+      - name: Upload package to FileDitch
         run: |
-          python source/scripts/storage_to_upload.py --directory . --output storage-to-urls-windows.json
-          if ($LASTEXITCODE -ne 0) { throw 'storage.to upload failed' }
-          Get-Content storage-to-urls-windows.json | Add-Content $env:GITHUB_STEP_SUMMARY
+          python playground/scripts/fileditch_upload.py --output fileditch-urls-windows.json Tasia-Viewer-windows-x64.zip Tasia-Viewer-windows-x64.zip.sha256
+          if ($LASTEXITCODE -ne 0) { throw 'FileDitch upload failed' }
+          Get-Content fileditch-urls-windows.json | Add-Content $env:GITHUB_STEP_SUMMARY
 
   linux-x64:
     name: Linux x64
@@ -52,6 +56,12 @@ jobs:
           token: ${{ secrets.TASIA_SOURCE_READ_TOKEN }}
           persist-credentials: false
           path: source
+      - uses: actions/checkout@v7
+        with:
+          repository: tasia-ai/tasia-playground
+          ref: ${{ github.ref }}
+          persist-credentials: false
+          path: playground
       - name: System libraries
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev
       - name: Rust stable
@@ -67,12 +77,10 @@ jobs:
           ./source/scripts/package.ps1 -Exe source/target/release/tasia-viewer -Out Tasia-Viewer-linux-x64 -Source source
           tar -czf Tasia-Viewer-linux-x64.tar.gz Tasia-Viewer-linux-x64
           sha256sum Tasia-Viewer-linux-x64.tar.gz > Tasia-Viewer-linux-x64.tar.gz.sha256
-      - name: Upload package to storage.to
-        env:
-          STORAGE_TO_TOKEN: ${{ secrets.STORAGE_TO_TOKEN }}
+      - name: Upload package to FileDitch
         run: |
-          python3 source/scripts/storage_to_upload.py --directory . --output storage-to-urls-linux.json
-          cat storage-to-urls-linux.json >> "$GITHUB_STEP_SUMMARY"
+          python3 playground/scripts/fileditch_upload.py --output fileditch-urls-linux.json Tasia-Viewer-linux-x64.tar.gz Tasia-Viewer-linux-x64.tar.gz.sha256
+          cat fileditch-urls-linux.json >> "$GITHUB_STEP_SUMMARY"
 
   macos-x64:
     name: macOS x64
@@ -89,7 +97,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: tasia-ai/tasia-playground
-          ref: main
+          ref: ${{ github.ref }}
           persist-credentials: false
           path: playground
       - name: Rust stable and target
@@ -102,13 +110,11 @@ jobs:
       - name: Package app
         shell: bash
         run: bash ./playground/scripts/package-macos-playground.sh x86_64-apple-darwin x64
-      - name: Upload package to storage.to
-        env:
-          STORAGE_TO_TOKEN: ${{ secrets.STORAGE_TO_TOKEN }}
+      - name: Upload package to FileDitch
         run: |
           shasum -a 256 Tasia-Viewer-macos-x64.zip > Tasia-Viewer-macos-x64.zip.sha256
-          python3 source/scripts/storage_to_upload.py --directory . --output storage-to-urls-macos-x64.json
-          cat storage-to-urls-macos-x64.json >> "$GITHUB_STEP_SUMMARY"
+          python3 playground/scripts/fileditch_upload.py --output fileditch-urls-macos-x64.json Tasia-Viewer-macos-x64.zip Tasia-Viewer-macos-x64.zip.sha256
+          cat fileditch-urls-macos-x64.json >> "$GITHUB_STEP_SUMMARY"
 
   macos-arm64:
     name: macOS arm64
@@ -125,7 +131,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: tasia-ai/tasia-playground
-          ref: main
+          ref: ${{ github.ref }}
           persist-credentials: false
           path: playground
       - name: Rust stable and target
@@ -138,10 +144,8 @@ jobs:
       - name: Package app
         shell: bash
         run: bash ./playground/scripts/package-macos-playground.sh aarch64-apple-darwin arm64
-      - name: Upload package to storage.to
-        env:
-          STORAGE_TO_TOKEN: ${{ secrets.STORAGE_TO_TOKEN }}
+      - name: Upload package to FileDitch
         run: |
           shasum -a 256 Tasia-Viewer-macos-arm64.zip > Tasia-Viewer-macos-arm64.zip.sha256
-          python3 source/scripts/storage_to_upload.py --directory . --output storage-to-urls-macos-arm64.json
-          cat storage-to-urls-macos-arm64.json >> "$GITHUB_STEP_SUMMARY"
+          python3 playground/scripts/fileditch_upload.py --output fileditch-urls-macos-arm64.json Tasia-Viewer-macos-arm64.zip Tasia-Viewer-macos-arm64.zip.sha256
+          cat fileditch-urls-macos-arm64.json >> "$GITHUB_STEP_SUMMARY"
