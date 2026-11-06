@@ -95,7 +95,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: tasia-ai/tasia-playground
-          ref: ${{ inputs.source_ref }}
+          ref: main
           persist-credentials: false
           path: playground
       - name: Rust stable and target
@@ -123,7 +123,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: tasia-ai/tasia-rust
-          ref: main
+          ref: ${{ inputs.source_ref }}
           token: ${{ secrets.TASIA_SOURCE_READ_TOKEN }}
           persist-credentials: false
           path: source
