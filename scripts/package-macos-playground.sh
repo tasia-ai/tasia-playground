@@ -3,7 +3,7 @@ set -euo pipefail
 
 target="$1"
 arch="$2"
-binary="source/target/$target/release/tasia-viewer"
+binary="source/target/$target/release/aurora-viewer"
 app="Tasia Viewer.app"
 contents="$app/Contents"
 version="$("$binary" --version)"
