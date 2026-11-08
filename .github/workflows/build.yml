@@ -8,19 +8,66 @@ on:
         required: true
         default: main
         type: string
+  push:
+    branches:
+      - build/big-tasia-20261108-0dba772
 
 permissions:
   contents: read
 
 jobs:
+  verify-source:
+    name: Verify Tasia features
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: tasia-ai/tasia-rust
+          ref: ${{ inputs.source_ref || '0dba772f77e6ac3f3a5e43c45348dfeedaf1dbc5' }}
+          token: ${{ secrets.TASIA_SOURCE_READ_TOKEN }}
+          persist-credentials: false
+          path: source
+      - name: Check pinned commit and essential Tasia components
+        shell: bash
+        env:
+          EXPECTED_SHA: 0dba772f77e6ac3f3a5e43c45348dfeedaf1dbc5
+        run: |
+          set -euo pipefail
+          actual="$(git -C source rev-parse HEAD)"
+          if [[ "${{ github.event_name }}" == "push" && "$actual" != "$EXPECTED_SHA" ]]; then
+            echo "::error::Source commit changed unexpectedly: $actual"
+            exit 1
+          fi
+          required=(
+            assets/branding/tasia-logo.png
+            crates/aurora-net/src/quic_transport.rs
+            crates/aurora-viewer/src/native_viewports.rs
+            crates/aurora-viewer/src/app/startup_splash.rs
+            crates/aurora-viewer/src/tasia_gallery.rs
+            crates/aurora-viewer/src/local_bakes.rs
+            crates/aurora-viewer/src/media/entry.rs
+            crates/aurora-viewer/src/media/update.rs
+            scripts/package.ps1
+            scripts/storage_to_upload.py
+          )
+          for path in "${required[@]}"; do
+            if [[ ! -f "source/$path" ]]; then
+              echo "::error::Missing Tasia component: $path"
+              exit 1
+            fi
+          done
+          echo "Source commit: $actual" >> "$GITHUB_STEP_SUMMARY"
+          echo "Verified ${#required[@]} expected Tasia files." >> "$GITHUB_STEP_SUMMARY"
+
   windows-x64:
+    needs: verify-source
     name: Windows x64
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
         with:
           repository: tasia-ai/tasia-rust
-          ref: ${{ inputs.source_ref }}
+          ref: ${{ inputs.source_ref || '0dba772f77e6ac3f3a5e43c45348dfeedaf1dbc5' }}
           token: ${{ secrets.TASIA_SOURCE_READ_TOKEN }}
           persist-credentials: false
           path: source
@@ -49,13 +96,14 @@ jobs:
           Get-Content storage-to-urls-windows.json | Add-Content $env:GITHUB_STEP_SUMMARY
 
   linux-x64:
+    needs: verify-source
     name: Linux x64
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
         with:
           repository: tasia-ai/tasia-rust
-          ref: ${{ inputs.source_ref }}
+          ref: ${{ inputs.source_ref || '0dba772f77e6ac3f3a5e43c45348dfeedaf1dbc5' }}
           token: ${{ secrets.TASIA_SOURCE_READ_TOKEN }}
           persist-credentials: false
           path: source
@@ -85,13 +133,14 @@ jobs:
           cat storage-to-urls-linux.json >> "$GITHUB_STEP_SUMMARY"
 
   macos-x64:
+    needs: verify-source
     name: macOS x64
     runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v7
         with:
           repository: tasia-ai/tasia-rust
-          ref: ${{ inputs.source_ref }}
+          ref: ${{ inputs.source_ref || '0dba772f77e6ac3f3a5e43c45348dfeedaf1dbc5' }}
           token: ${{ secrets.TASIA_SOURCE_READ_TOKEN }}
           persist-credentials: false
           path: source
@@ -121,13 +170,14 @@ jobs:
           cat storage-to-urls-macos-x64.json >> "$GITHUB_STEP_SUMMARY"
 
   macos-arm64:
+    needs: verify-source
     name: macOS arm64
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v7
         with:
           repository: tasia-ai/tasia-rust
-          ref: ${{ inputs.source_ref }}
+          ref: ${{ inputs.source_ref || '0dba772f77e6ac3f3a5e43c45348dfeedaf1dbc5' }}
           token: ${{ secrets.TASIA_SOURCE_READ_TOKEN }}
           persist-credentials: false
           path: source
