@@ -3,7 +3,11 @@ set -euo pipefail
 
 target="$1"
 arch="$2"
-binary="source/target/$target/release/aurora-viewer"
+binary="source/target/$target/release/tasia-viewer"
+if [[ ! -x "$binary" ]]; then
+  echo "::error::Expected built executable missing or not executable: $binary" >&2
+  exit 1
+fi
 app="Tasia Viewer.app"
 contents="$app/Contents"
 version="$("$binary" --version)"
