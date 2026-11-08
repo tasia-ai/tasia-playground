@@ -82,8 +82,11 @@ jobs:
       - name: Package
         shell: pwsh
         run: |
-          ./source/scripts/package.ps1 -Exe source/target/release/aurora-viewer.exe -Out Tasia-Viewer-windows-x64 -Source source
-          Rename-Item -LiteralPath Tasia-Viewer-windows-x64/aurora-viewer.exe -NewName tasia-viewer.exe
+          $ErrorActionPreference = 'Stop'
+          $exe = 'source/target/release/tasia-viewer.exe'
+          if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw "Expected Tasia Viewer executable is missing: $exe" }
+          ./source/scripts/package.ps1 -Exe $exe -Out Tasia-Viewer-windows-x64 -Source source
+          if (-not (Test-Path -LiteralPath 'Tasia-Viewer-windows-x64/tasia-viewer.exe' -PathType Leaf)) { throw 'Windows package missing Tasia Viewer executable' }
           Compress-Archive -Path Tasia-Viewer-windows-x64 -DestinationPath Tasia-Viewer-windows-x64.zip
           $hash = (Get-FileHash -LiteralPath Tasia-Viewer-windows-x64.zip -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  Tasia-Viewer-windows-x64.zip" | Set-Content -LiteralPath Tasia-Viewer-windows-x64.zip.sha256 -Encoding utf8NoBOM
@@ -122,10 +125,12 @@ jobs:
       - name: Package
         shell: pwsh
         run: |
-          ./source/scripts/package.ps1 -Exe source/target/release/aurora-viewer -Out Tasia-Viewer-linux-x64 -Source source
-          Rename-Item -LiteralPath Tasia-Viewer-linux-x64/aurora-viewer -NewName tasia-viewer
-          $desktop = 'Tasia-Viewer-linux-x64/aurora-viewer.desktop'
-          (Get-Content -LiteralPath $desktop -Raw).Replace('Exec=aurora-viewer', 'Exec=tasia-viewer') | Set-Content -LiteralPath $desktop -NoNewline
+          $ErrorActionPreference = 'Stop'
+          $exe = 'source/target/release/tasia-viewer'
+          if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw "Expected Tasia Viewer executable is missing: $exe" }
+          ./source/scripts/package.ps1 -Exe $exe -Out Tasia-Viewer-linux-x64 -Source source
+          if (-not (Test-Path -LiteralPath 'Tasia-Viewer-linux-x64/tasia-viewer' -PathType Leaf)) { throw 'Linux package missing Tasia Viewer executable' }
+          if (-not (Test-Path -LiteralPath 'Tasia-Viewer-linux-x64/tasia-viewer.desktop' -PathType Leaf)) { throw 'Linux package missing desktop entry' }
           tar -czf Tasia-Viewer-linux-x64.tar.gz Tasia-Viewer-linux-x64
           sha256sum Tasia-Viewer-linux-x64.tar.gz > Tasia-Viewer-linux-x64.tar.gz.sha256
       - name: Upload package to storage.to
