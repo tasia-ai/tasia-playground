@@ -7,6 +7,14 @@ on:
         required: true
         default: v0.9.9
         type: string
+      mode:
+        description: Preview or isolated candidate dry run
+        required: true
+        default: preview
+        type: choice
+        options:
+          - preview
+          - candidate
 permissions:
   contents: read
 concurrency:
@@ -23,6 +31,7 @@ jobs:
         env:
           PRIVATE_TOKEN: ${{ secrets.TASIA_SOURCE_READ_TOKEN }}
           VERSION: ${{ inputs.version }}
+          MODE: ${{ inputs.mode }}
         run: |
           set -eu
           umask 077
@@ -41,4 +50,8 @@ jobs:
           cd tasia-rust-automerge
           if ! cargo test --quiet > /dev/null 2>&1; then echo 'Engine tests failed'; exit 1; fi
           if ! cargo build --quiet > /dev/null 2>&1; then echo 'Engine build failed'; exit 1; fi
-          ./target/debug/tasia-automerge ../tasia-rust "$VERSION"
+          if [ "$MODE" = candidate ]; then
+            ./target/debug/tasia-automerge ../tasia-rust "$VERSION" --candidate "$root/candidate"
+          else
+            ./target/debug/tasia-automerge ../tasia-rust "$VERSION"
+          fi
