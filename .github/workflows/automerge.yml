@@ -1,0 +1,44 @@
+name: AutoMerge preview
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Aurora release tag
+        required: true
+        default: v0.9.9
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: tasia-automerge
+  cancel-in-progress: false
+jobs:
+  preview:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Retrieve private repositories and preview
+        shell: bash
+        env:
+          PRIVATE_TOKEN: ${{ secrets.TASIA_SOURCE_READ_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -eu
+          umask 077
+          export GIT_TERMINAL_PROMPT=0
+          root=$(mktemp -d)
+          trap 'rm -rf "$root"' EXIT
+          cd "$root"
+          auth=$(printf 'x-access-token:%s' "$PRIVATE_TOKEN" | base64 -w0)
+          echo "::add-mask::$auth"
+          for repo in tasia-rust-automerge tasia-rust; do
+            if ! git -c "http.extraHeader=Authorization: Basic $auth" clone --quiet --single-branch --branch main "https://github.com/tasia-ai/$repo.git" "$repo" > /dev/null 2>&1; then
+              echo 'Private checkout failed'; exit 1
+            fi
+          done
+          unset PRIVATE_TOKEN auth
+          cd tasia-rust-automerge
+          if ! cargo test --quiet > /dev/null 2>&1; then echo 'Engine tests failed'; exit 1; fi
+          if ! cargo build --quiet > /dev/null 2>&1; then echo 'Engine build failed'; exit 1; fi
+          ./target/debug/tasia-automerge ../tasia-rust "$VERSION"
