@@ -49,7 +49,8 @@ jobs:
 
   linux-x64:
     name: Linux x64
-    runs-on: ubuntu-24.04
+    # Match the AppImage compatibility baseline (glibc 2.35).
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v7
         with:
@@ -73,6 +74,51 @@ jobs:
           ./source/scripts/package.ps1 -Exe source/target/release/tasia-viewer -Out Tasia-Viewer-linux-x64 -Source source
           tar -czf Tasia-Viewer-linux-x64.tar.gz Tasia-Viewer-linux-x64
           sha256sum Tasia-Viewer-linux-x64.tar.gz > Tasia-Viewer-linux-x64.tar.gz.sha256
+      - name: Create and smoke-test AppImage
+        env:
+          APPIMAGETOOL_SHA256: e8c1169c4af66c3184d7ee110713d4be04befe671fa358e2c1591ee840553b03
+          APPIMAGE_RUNTIME_SHA256: 617aa77314d57c8b8e4fae9c3f0b35af7b30d5529cb69e98f64f92510ed98a46
+        run: |
+          set -euo pipefail
+          tool_dir="$(mktemp -d "$RUNNER_TEMP/appimage-tools.XXXXXX")"
+          trap 'rm -rf "$tool_dir"' EXIT
+          curl --fail --location --silent --show-error \
+            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage \
+            --output "$tool_dir/appimagetool.AppImage"
+          curl --fail --location --silent --show-error \
+            https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64 \
+            --output "$tool_dir/appimage-runtime-x86_64"
+          echo "$APPIMAGETOOL_SHA256  $tool_dir/appimagetool.AppImage" | sha256sum --check --status
+          echo "$APPIMAGE_RUNTIME_SHA256  $tool_dir/appimage-runtime-x86_64" | sha256sum --check --status
+          chmod 755 "$tool_dir/appimagetool.AppImage" "$tool_dir/appimage-runtime-x86_64"
+
+          source_commit="$(git -C source rev-parse HEAD)"
+          (
+            cd source
+            APPIMAGETOOL="$tool_dir/appimagetool.AppImage" \
+              APPIMAGE_RUNTIME_FILE="$tool_dir/appimage-runtime-x86_64" \
+              scripts/package-appimage.sh \
+                "$GITHUB_WORKSPACE/Tasia-Viewer-linux-x64" \
+                "$GITHUB_WORKSPACE/Tasia-Viewer-linux-x64.AppImage" \
+                "$source_commit"
+          )
+
+          built_version="$(source/target/release/tasia-viewer --version)"
+          appimage_version="$(APPIMAGE_EXTRACT_AND_RUN=1 ./Tasia-Viewer-linux-x64.AppImage --version)"
+          test "$appimage_version" = "$built_version"
+          extract_dir="$(mktemp -d)"
+          trap 'rm -rf "$extract_dir" "$tool_dir"' EXIT
+          (
+            cd "$extract_dir"
+            "$GITHUB_WORKSPACE/Tasia-Viewer-linux-x64.AppImage" --appimage-extract >/dev/null
+          )
+          embedded_commit="$(cat "$extract_dir/squashfs-root/usr/share/doc/tasia-viewer/source-commit")"
+          test "$embedded_commit" = "$source_commit"
+          if ldd "$extract_dir/squashfs-root/tasia-viewer" | grep -q 'not found'; then
+            echo 'The AppImage has unresolved shared-library dependencies.' >&2
+            ldd "$extract_dir/squashfs-root/tasia-viewer" >&2
+            exit 1
+          fi
       - name: Upload package to storage.to
         env:
           STORAGE_TO_TOKEN: ${{ secrets.STORAGE_TO_TOKEN }}
