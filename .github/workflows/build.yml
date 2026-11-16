@@ -48,7 +48,7 @@ jobs:
           status="$(curl --fail-with-body --silent --show-error --output /dev/null --write-out '%{http_code}' \
             -H "Authorization: Bearer $STORAGE_TOKEN" \
             -H "X-Storage-Branch: $STORAGE_BRANCH" \
-            -H 'X-Storage-Product: Tasiaviewer' \
+            -H 'X-Storage-Product: Tasia-Viewer' \
             --upload-file "$test_file" \
             "$upload_url")"
 
