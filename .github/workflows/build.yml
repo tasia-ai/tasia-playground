@@ -24,6 +24,7 @@ jobs:
           token: ${{ secrets.TASIA_SOURCE_READ_TOKEN }}
           persist-credentials: false
           path: source
+          fetch-depth: 0
       - name: Rust stable
         run: rustup update stable --no-self-update
       - uses: actions/setup-python@v6
@@ -32,6 +33,15 @@ jobs:
       - name: Build
         working-directory: source
         run: cargo build --release --locked -p aurora-viewer
+      - name: Verify build version
+        shell: pwsh
+        run: |
+          $version = & ./source/target/release/tasia-viewer.exe --version
+          if ($LASTEXITCODE -ne 0) { throw 'Could not read the built viewer version.' }
+          if ($version -notmatch '^Tasia Viewer \d+\.\d+\.\d+(?:[+-][0-9A-Za-z.-]+)?$' -or $version -match '^Tasia Viewer 0\.0\.0(?:[+-]|$)') {
+            throw "Invalid or placeholder viewer version: $version"
+          }
+          "Windows build: $version" >> $env:GITHUB_STEP_SUMMARY
       - name: Package
         shell: pwsh
         run: |
@@ -59,6 +69,7 @@ jobs:
           token: ${{ secrets.TASIA_SOURCE_READ_TOKEN }}
           persist-credentials: false
           path: source
+          fetch-depth: 0
       - name: System libraries
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev
       - name: Rust stable
@@ -68,6 +79,14 @@ jobs:
         env:
           CARGO_PROFILE_RELEASE_STRIP: debuginfo
         run: cargo build --release --locked -p aurora-viewer
+      - name: Verify build version
+        run: |
+          version="$(source/target/release/tasia-viewer --version)"
+          if [[ "$version" =~ ^Tasia\ Viewer\ 0\.0\.0([+-]|$) || ! "$version" =~ ^Tasia\ Viewer\ [0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid or placeholder viewer version: $version" >&2
+            exit 1
+          fi
+          echo "Linux build: $version" >> "$GITHUB_STEP_SUMMARY"
       - name: Package
         shell: pwsh
         run: |
@@ -151,6 +170,14 @@ jobs:
         env:
           CARGO_PROFILE_RELEASE_STRIP: debuginfo
         run: cargo build --release --locked --target x86_64-apple-darwin -p aurora-viewer
+      - name: Verify build version
+        run: |
+          version="$(source/target/x86_64-apple-darwin/release/tasia-viewer --version)"
+          if [[ "$version" =~ ^Tasia\ Viewer\ 0\.0\.0([+-]|$) || ! "$version" =~ ^Tasia\ Viewer\ [0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid or placeholder viewer version: $version" >&2
+            exit 1
+          fi
+          echo "macOS x64 build: $version" >> "$GITHUB_STEP_SUMMARY"
       - name: Package app
         shell: bash
         run: bash ./playground/scripts/package-macos-playground.sh x86_64-apple-darwin x64
@@ -187,6 +214,14 @@ jobs:
         env:
           CARGO_PROFILE_RELEASE_STRIP: debuginfo
         run: cargo build --release --locked --target aarch64-apple-darwin -p aurora-viewer
+      - name: Verify build version
+        run: |
+          version="$(source/target/aarch64-apple-darwin/release/tasia-viewer --version)"
+          if [[ "$version" =~ ^Tasia\ Viewer\ 0\.0\.0([+-]|$) || ! "$version" =~ ^Tasia\ Viewer\ [0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid or placeholder viewer version: $version" >&2
+            exit 1
+          fi
+          echo "macOS arm64 build: $version" >> "$GITHUB_STEP_SUMMARY"
       - name: Package app
         shell: bash
         run: bash ./playground/scripts/package-macos-playground.sh aarch64-apple-darwin arm64
