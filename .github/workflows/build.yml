@@ -2,13 +2,60 @@ name: Tasia Viewer platform builds
 
 on:
   workflow_dispatch:
+    inputs:
+      storage_test_only:
+        description: Run only the small artifact API connectivity test
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
+  storage-api-test:
+    name: Storage API connectivity test
+    if: ${{ inputs.storage_test_only == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Upload test artifact
+        shell: bash
+        env:
+          STORAGE_URL: ${{ secrets.STORAGE_URL }}
+          STORAGE_TOKEN: ${{ secrets.STORAGE_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${STORAGE_URL:-}" ]]; then
+            echo 'Set the STORAGE_URL Actions secret before running this test.' >&2
+            exit 1
+          fi
+          if [[ -z "${STORAGE_TOKEN:-}" ]]; then
+            echo 'Set the STORAGE_TOKEN Actions secret before running this test.' >&2
+            exit 1
+          fi
+
+          filename='storage-api-test.txt'
+          test_file="$RUNNER_TEMP/$filename"
+          printf 'Tasia Viewer artifact API connectivity test.\n' > "$test_file"
+          upload_url="${STORAGE_URL%/}/artifacts/$GITHUB_REPOSITORY/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT/$filename"
+          status="$(curl --fail-with-body --silent --show-error --output /dev/null --write-out '%{http_code}' \
+            -H "Authorization: Bearer $STORAGE_TOKEN" \
+            -H "X-Storage-Branch: $GITHUB_REF_NAME" \
+            -H 'X-Storage-Product: viewer' \
+            --upload-file "$test_file" \
+            "$upload_url")"
+
+          if [[ ! "$status" =~ ^2[0-9]{2}$ ]]; then
+            echo "Artifact API upload returned HTTP $status, expected a 2xx response." >&2
+            exit 1
+          fi
+          echo "Artifact API test upload succeeded (HTTP $status)."
+          echo 'A small test artifact was stored under this workflow run path; the workflow does not delete it.' >> "$GITHUB_STEP_SUMMARY"
+
   windows-x64:
     name: Windows x64
+    if: ${{ inputs.storage_test_only != true }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v7
@@ -43,6 +90,7 @@ jobs:
 
   linux-x64:
     name: Linux x64
+    if: ${{ inputs.storage_test_only != true }}
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
@@ -76,6 +124,7 @@ jobs:
 
   macos-x64:
     name: macOS x64
+    if: ${{ inputs.storage_test_only != true }}
     runs-on: macos-15-intel
     steps:
       - uses: actions/checkout@v7
@@ -112,6 +161,7 @@ jobs:
 
   macos-arm64:
     name: macOS arm64
+    if: ${{ inputs.storage_test_only != true }}
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v7
