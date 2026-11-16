@@ -8,6 +8,11 @@ on:
         required: true
         type: boolean
         default: false
+      storage_branch:
+        description: Release Center branch route to test
+        required: true
+        type: string
+        default: main
 
 permissions:
   contents: read
@@ -24,6 +29,7 @@ jobs:
         env:
           STORAGE_URL: ${{ secrets.STORAGE_URL }}
           STORAGE_TOKEN: ${{ secrets.STORAGE_TOKEN }}
+          STORAGE_BRANCH: ${{ inputs.storage_branch }}
         run: |
           set -euo pipefail
           if [[ -z "${STORAGE_URL:-}" ]]; then
@@ -41,8 +47,8 @@ jobs:
           upload_url="${STORAGE_URL%/}/artifacts/$GITHUB_REPOSITORY/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT/$filename"
           status="$(curl --fail-with-body --silent --show-error --output /dev/null --write-out '%{http_code}' \
             -H "Authorization: Bearer $STORAGE_TOKEN" \
-            -H "X-Storage-Branch: $GITHUB_REF_NAME" \
-            -H 'X-Storage-Product: viewer' \
+            -H "X-Storage-Branch: $STORAGE_BRANCH" \
+            -H 'X-Storage-Product: Tasiaviewer' \
             --upload-file "$test_file" \
             "$upload_url")"
 
