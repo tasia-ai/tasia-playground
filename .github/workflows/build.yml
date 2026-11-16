@@ -25,6 +25,22 @@ jobs:
           persist-credentials: false
           path: source
           fetch-depth: 0
+          fetch-tags: true
+      - name: Restore source version anchor
+        shell: bash
+        working-directory: source
+        run: |
+          version_anchor='e03653c3c17219c8429394ec1bc126b515128572'
+          if ! git merge-base --is-ancestor "$version_anchor" HEAD; then
+            echo 'Source ref predates the v1.0.0 version anchor; using its fetched tags.'
+            exit 0
+          fi
+          if git show-ref --verify --quiet refs/tags/v1.0.0; then
+            test "$(git rev-parse 'v1.0.0^{commit}')" = "$version_anchor"
+          else
+            git tag v1.0.0 "$version_anchor"
+          fi
+          git describe --tags --match 'v[0-9]*.[0-9]*.[0-9]*' --long --abbrev=9
       - name: Rust stable
         run: rustup update stable --no-self-update
       - uses: actions/setup-python@v6
@@ -70,6 +86,22 @@ jobs:
           persist-credentials: false
           path: source
           fetch-depth: 0
+          fetch-tags: true
+      - name: Restore source version anchor
+        shell: bash
+        working-directory: source
+        run: |
+          version_anchor='e03653c3c17219c8429394ec1bc126b515128572'
+          if ! git merge-base --is-ancestor "$version_anchor" HEAD; then
+            echo 'Source ref predates the v1.0.0 version anchor; using its fetched tags.'
+            exit 0
+          fi
+          if git show-ref --verify --quiet refs/tags/v1.0.0; then
+            test "$(git rev-parse 'v1.0.0^{commit}')" = "$version_anchor"
+          else
+            git tag v1.0.0 "$version_anchor"
+          fi
+          git describe --tags --match 'v[0-9]*.[0-9]*.[0-9]*' --long --abbrev=9
       - name: System libraries
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev
       - name: Rust stable
@@ -157,6 +189,22 @@ jobs:
           persist-credentials: false
           path: source
           fetch-depth: 0
+          fetch-tags: true
+      - name: Restore source version anchor
+        shell: bash
+        working-directory: source
+        run: |
+          version_anchor='e03653c3c17219c8429394ec1bc126b515128572'
+          if ! git merge-base --is-ancestor "$version_anchor" HEAD; then
+            echo 'Source ref predates the v1.0.0 version anchor; using its fetched tags.'
+            exit 0
+          fi
+          if git show-ref --verify --quiet refs/tags/v1.0.0; then
+            test "$(git rev-parse 'v1.0.0^{commit}')" = "$version_anchor"
+          else
+            git tag v1.0.0 "$version_anchor"
+          fi
+          git describe --tags --match 'v[0-9]*.[0-9]*.[0-9]*' --long --abbrev=9
       - uses: actions/checkout@v7
         with:
           repository: tasia-ai/tasia-playground
@@ -201,6 +249,22 @@ jobs:
           persist-credentials: false
           path: source
           fetch-depth: 0
+          fetch-tags: true
+      - name: Restore source version anchor
+        shell: bash
+        working-directory: source
+        run: |
+          version_anchor='e03653c3c17219c8429394ec1bc126b515128572'
+          if ! git merge-base --is-ancestor "$version_anchor" HEAD; then
+            echo 'Source ref predates the v1.0.0 version anchor; using its fetched tags.'
+            exit 0
+          fi
+          if git show-ref --verify --quiet refs/tags/v1.0.0; then
+            test "$(git rev-parse 'v1.0.0^{commit}')" = "$version_anchor"
+          else
+            git tag v1.0.0 "$version_anchor"
+          fi
+          git describe --tags --match 'v[0-9]*.[0-9]*.[0-9]*' --long --abbrev=9
       - uses: actions/checkout@v7
         with:
           repository: tasia-ai/tasia-playground
