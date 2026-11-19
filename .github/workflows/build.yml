@@ -17,7 +17,28 @@ permissions:
   contents: read
 
 jobs:
+  storage-preflight:
+    name: Validate candidate storage configuration
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check required secrets without exposing them
+        shell: bash
+        env:
+          UPLOAD: ${{ inputs.upload }}
+          STORAGE_URL: ${{ secrets.STORAGE_URL }}
+          STORAGE_TOKEN: ${{ secrets.STORAGE_TOKEN }}
+          SOURCE_TOKEN: ${{ secrets.TASIA_SOURCE_READ_TOKEN }}
+        run: |
+          set -euo pipefail
+          : "${SOURCE_TOKEN:?Missing TASIA_SOURCE_READ_TOKEN}"
+          if [[ "$UPLOAD" == true ]]; then
+            : "${STORAGE_URL:?Missing STORAGE_URL}"
+            : "${STORAGE_TOKEN:?Missing STORAGE_TOKEN}"
+            [[ "$STORAGE_URL" =~ ^https://[^/\?\#@]+/?$ ]] || { echo 'STORAGE_URL must be the HTTPS origin only'; exit 1; }
+          fi
+
   windows-x64:
+    needs: storage-preflight
     name: Windows x64
     runs-on: windows-latest
     steps:
@@ -77,6 +98,7 @@ jobs:
           done
 
   linux-x64:
+    needs: storage-preflight
     name: Linux x64
     runs-on: ubuntu-24.04
     steps:
@@ -128,6 +150,7 @@ jobs:
           done
 
   macos-x64:
+    needs: storage-preflight
     name: macOS x64
     runs-on: macos-15-intel
     steps:
@@ -187,6 +210,7 @@ jobs:
           done
 
   macos-arm64:
+    needs: storage-preflight
     name: macOS arm64
     runs-on: macos-15
     steps:
