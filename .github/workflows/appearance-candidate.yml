@@ -57,8 +57,12 @@ jobs:
       - name: Workspace tests
         run: cargo +stable test --locked --workspace
 
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+
       - name: Test storage uploader
-        run: python3 -m unittest discover -s scripts -p test_storage_to_upload.py
+        run: python -m unittest discover -s scripts -p test_storage_to_upload.py
 
       - name: Package candidate without publishing
         shell: pwsh
