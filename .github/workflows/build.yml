@@ -105,6 +105,7 @@ jobs:
           token: ${{ secrets.TASIA_SOURCE_READ_TOKEN }}
           persist-credentials: false
           path: source
+          fetch-depth: 0
       - name: Record exact source revision
         shell: bash
         working-directory: source
@@ -112,7 +113,6 @@ jobs:
           echo "Source: tasia-ai/tasia-rust" >> "$GITHUB_STEP_SUMMARY"
           echo "Requested ref: ${{ inputs.source_ref }}" >> "$GITHUB_STEP_SUMMARY"
           echo "Checked out SHA: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
-          fetch-depth: 0
       - uses: actions/checkout@v7
         with:
           repository: tasia-ai/tasia-playground
@@ -148,6 +148,7 @@ jobs:
           token: ${{ secrets.TASIA_SOURCE_READ_TOKEN }}
           persist-credentials: false
           path: source
+          fetch-depth: 0
       - name: Record exact source revision
         shell: bash
         working-directory: source
@@ -155,7 +156,6 @@ jobs:
           echo "Source: tasia-ai/tasia-rust" >> "$GITHUB_STEP_SUMMARY"
           echo "Requested ref: ${{ inputs.source_ref }}" >> "$GITHUB_STEP_SUMMARY"
           echo "Checked out SHA: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
-          fetch-depth: 0
       - uses: actions/checkout@v7
         with:
           repository: tasia-ai/tasia-playground
