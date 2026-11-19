@@ -13,9 +13,19 @@ permissions:
   contents: read
 
 jobs:
-  windows:
-    name: Windows build and workspace tests
-    runs-on: windows-latest
+  candidate:
+    name: ${{ matrix.name }} build and workspace tests
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+          - name: Linux
+            os: ubuntu-24.04
+          - name: macOS
+            os: macos-15-intel
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     steps:
       - name: Check out the selected Tasia source
@@ -25,6 +35,10 @@ jobs:
           ref: ${{ inputs.source_ref }}
           token: ${{ secrets.TASIA_SOURCE_READ_TOKEN }}
           persist-credentials: false
+
+      - name: Install Linux viewer dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev
 
       - name: Rust stable
         run: |
@@ -45,5 +59,6 @@ jobs:
         env:
           SOURCE_REF: ${{ inputs.source_ref }}
         run: |
+          "Platform: ``${{ matrix.name }}``" | Add-Content $env:GITHUB_STEP_SUMMARY
           "Source: ``tasia-ai/tasia-rust@$env:SOURCE_REF``" | Add-Content $env:GITHUB_STEP_SUMMARY
           "Commit: ``$(git rev-parse HEAD)``" | Add-Content $env:GITHUB_STEP_SUMMARY
