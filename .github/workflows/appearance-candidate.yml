@@ -6,7 +6,7 @@ on:
       source_ref:
         description: Branch or commit in tasia-ai/tasia-rust
         required: true
-        default: test/appearance-bom-repair
+        default: fix/tasia-profile-marks-foundation
         type: string
 
 permissions:
@@ -23,8 +23,10 @@ jobs:
             os: windows-latest
           - name: Linux
             os: ubuntu-24.04
-          - name: macOS
+          - name: macOS x64
             os: macos-15-intel
+          - name: macOS arm64
+            os: macos-15
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     steps:
@@ -35,6 +37,7 @@ jobs:
           ref: ${{ inputs.source_ref }}
           token: ${{ secrets.TASIA_SOURCE_READ_TOKEN }}
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Install Linux viewer dependencies
         if: runner.os == 'Linux'
@@ -49,11 +52,48 @@ jobs:
         run: cargo +stable fmt --all -- --check
 
       - name: Build viewer
-        run: cargo +stable build --locked -p aurora-viewer
+        run: cargo +stable build --release --locked -p aurora-viewer
 
       - name: Workspace tests
         run: cargo +stable test --locked --workspace
 
+      - name: Test storage uploader
+        run: python3 -m unittest discover -s scripts -p test_storage_to_upload.py
+
+      - name: Package candidate without publishing
+        shell: pwsh
+        run: |
+          $suffix = if ($IsWindows) { '.exe' } else { '' }
+          $exe = "target/release/aurora-viewer$suffix"
+          if (-not (Test-Path -LiteralPath $exe)) { $exe = "target/release/tasia-viewer$suffix" }
+          if (-not (Test-Path -LiteralPath $exe)) { throw 'Viewer executable missing' }
+          $out = Join-Path $env:RUNNER_TEMP 'Tasia-candidate'
+          if ($IsMacOS) {
+            $app = Join-Path $out 'Tasia Viewer.app'
+            ./scripts/package-macos.ps1 -Exe $exe -Out $app
+            if (-not $?) { throw 'macOS packaging failed' }
+            & codesign --force --sign - $app
+            if ($LASTEXITCODE -ne 0) { throw 'Signing failed' }
+            & codesign --verify --strict $app
+            if ($LASTEXITCODE -ne 0) { throw 'Signature verification failed' }
+            & ditto -c -k --keepParent $app (Join-Path $env:RUNNER_TEMP 'Tasia-candidate.zip')
+            if ($LASTEXITCODE -ne 0) { throw 'ZIP failed' }
+          } else {
+            ./scripts/package.ps1 -Exe $exe -Out $out
+            if (-not $?) { throw 'Packaging failed' }
+            if ($IsWindows) {
+              Compress-Archive -Path $out -DestinationPath (Join-Path $env:RUNNER_TEMP 'Tasia-candidate.zip')
+            } else {
+              & tar -czf (Join-Path $env:RUNNER_TEMP 'Tasia-candidate.tar.gz') -C $env:RUNNER_TEMP Tasia-candidate
+              if ($LASTEXITCODE -ne 0) { throw 'Archive failed' }
+            }
+          }
+          Get-ChildItem -LiteralPath $env:RUNNER_TEMP -File -Filter 'Tasia-candidate.*' | ForEach-Object {
+            $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($_.Name)" | Set-Content -LiteralPath "$($_.FullName).sha256" -Encoding utf8NoBOM
+          }
+
+      # The source is private; do not upload binaries to public Actions artifacts.
       - name: Record tested revision
         shell: pwsh
         env:
