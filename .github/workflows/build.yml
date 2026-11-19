@@ -91,7 +91,7 @@ jobs:
             curl --fail-with-body --silent --show-error \
               -H "Authorization: Bearer $STORAGE_TOKEN" \
               -H "X-Storage-Branch: beta" \
-              -H "X-Storage-Product: Tasiaviewer" \
+              -H "X-Storage-Product: Tasia-Viewer" \
               --upload-file "$file" \
               "${STORAGE_URL%/}/artifacts/$GITHUB_REPOSITORY/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT/$file" > /dev/null
             printf 'Uploaded candidate: %s\n' "$file" >> "$GITHUB_STEP_SUMMARY"
@@ -143,7 +143,7 @@ jobs:
             curl --fail-with-body --silent --show-error \
               -H "Authorization: Bearer $STORAGE_TOKEN" \
               -H "X-Storage-Branch: beta" \
-              -H "X-Storage-Product: Tasiaviewer" \
+              -H "X-Storage-Product: Tasia-Viewer" \
               --upload-file "$file" \
               "${STORAGE_URL%/}/artifacts/$GITHUB_REPOSITORY/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT/$file" > /dev/null
             printf 'Uploaded candidate: %s\n' "$file" >> "$GITHUB_STEP_SUMMARY"
@@ -203,7 +203,7 @@ jobs:
             curl --fail-with-body --silent --show-error \
               -H "Authorization: Bearer $STORAGE_TOKEN" \
               -H "X-Storage-Branch: beta" \
-              -H "X-Storage-Product: Tasiaviewer" \
+              -H "X-Storage-Product: Tasia-Viewer" \
               --upload-file "$file" \
               "${STORAGE_URL%/}/artifacts/$GITHUB_REPOSITORY/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT/$file" > /dev/null
             printf 'Uploaded candidate: %s\n' "$file" >> "$GITHUB_STEP_SUMMARY"
@@ -263,7 +263,7 @@ jobs:
             curl --fail-with-body --silent --show-error \
               -H "Authorization: Bearer $STORAGE_TOKEN" \
               -H "X-Storage-Branch: beta" \
-              -H "X-Storage-Product: Tasiaviewer" \
+              -H "X-Storage-Product: Tasia-Viewer" \
               --upload-file "$file" \
               "${STORAGE_URL%/}/artifacts/$GITHUB_REPOSITORY/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT/$file" > /dev/null
             printf 'Uploaded candidate: %s\n' "$file" >> "$GITHUB_STEP_SUMMARY"
