@@ -67,6 +67,12 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw "Tests failed: $project" }
           }
 
+      - name: Database-free scripting regressions
+        working-directory: source
+        run: |
+          dotnet test Tests/OpenSim.Region.ScriptEngine.Tests/OpenSim.Region.ScriptEngine.Tests.csproj -c Release --filter 'FullyQualifiedName~LSL_TypesTestLSLFloat|FullyQualifiedName~LSL_ApiUserTests' -p:PlatformTarget=x64
+          if ($LASTEXITCODE -ne 0) { throw 'Script regressions failed' }
+
       - name: Publish self-contained server bundles
         working-directory: source
         env:
@@ -97,9 +103,9 @@ jobs:
             'Abstractions', 'AbuseReports', 'AccessLogger', 'AlertNotifications',
             'ChatAudit', 'DisplayNameCaps', 'FriendConference', 'JoinApi',
             'LoginSecurity', 'MACAudit', 'Marketplace', 'MetricsConnector',
-            'Quic', 'RemoteSound', 'RestartModule', 'SharedInventory', 'WoWonder'
+            'Quic', 'RemoteSound', 'RestartModule', 'SharedInventory', 'WebScripts', 'WoWonder'
           )
-          $required = @('OpenSim.dll', 'OpenSim.Data.PGSQL.dll', 'Npgsql.dll')
+          $required = @('OpenSim.dll', 'OpenSim.Data.PGSQL.dll', 'Npgsql.dll', 'OpenSim.Region.OptionalModules.AI.dll')
           $required += $addons | ForEach-Object { "TasiaAddons.$_.dll" }
           foreach ($file in $required) {
             if (!(Test-Path (Join-Path $region $file) -PathType Leaf)) { throw "Region package missing $file" }
