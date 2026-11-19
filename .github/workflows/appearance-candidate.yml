@@ -1,0 +1,49 @@
+name: Appearance candidate build and tests
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Branch or commit in tasia-ai/tasia-rust
+        required: true
+        default: test/appearance-bom-repair
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows build and workspace tests
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out the selected Tasia source
+        uses: actions/checkout@v7
+        with:
+          repository: tasia-ai/tasia-rust
+          ref: ${{ inputs.source_ref }}
+          token: ${{ secrets.TASIA_SOURCE_READ_TOKEN }}
+          persist-credentials: false
+
+      - name: Rust stable
+        run: |
+          rustup update stable --no-self-update
+          rustup component add rustfmt
+
+      - name: Formatting
+        run: cargo +stable fmt --all -- --check
+
+      - name: Build viewer
+        run: cargo +stable build --locked -p aurora-viewer
+
+      - name: Workspace tests
+        run: cargo +stable test --locked --workspace
+
+      - name: Record tested revision
+        shell: pwsh
+        env:
+          SOURCE_REF: ${{ inputs.source_ref }}
+        run: |
+          "Source: ``tasia-ai/tasia-rust@$env:SOURCE_REF``" | Add-Content $env:GITHUB_STEP_SUMMARY
+          "Commit: ``$(git rev-parse HEAD)``" | Add-Content $env:GITHUB_STEP_SUMMARY
