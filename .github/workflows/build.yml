@@ -27,9 +27,11 @@ jobs:
       - name: Record exact source revision
         shell: bash
         working-directory: source
+        env:
+          REQUESTED_SOURCE_REF: ${{ inputs.source_ref }}
         run: |
           echo "Source: tasia-ai/tasia-rust" >> "$GITHUB_STEP_SUMMARY"
-          echo "Requested ref: ${{ inputs.source_ref }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Requested ref: $REQUESTED_SOURCE_REF" >> "$GITHUB_STEP_SUMMARY"
           echo "Checked out SHA: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
       - name: Rust stable
         run: rustup update stable --no-self-update
@@ -68,9 +70,11 @@ jobs:
       - name: Record exact source revision
         shell: bash
         working-directory: source
+        env:
+          REQUESTED_SOURCE_REF: ${{ inputs.source_ref }}
         run: |
           echo "Source: tasia-ai/tasia-rust" >> "$GITHUB_STEP_SUMMARY"
-          echo "Requested ref: ${{ inputs.source_ref }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Requested ref: $REQUESTED_SOURCE_REF" >> "$GITHUB_STEP_SUMMARY"
           echo "Checked out SHA: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
       - name: System libraries
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev
@@ -109,9 +113,11 @@ jobs:
       - name: Record exact source revision
         shell: bash
         working-directory: source
+        env:
+          REQUESTED_SOURCE_REF: ${{ inputs.source_ref }}
         run: |
           echo "Source: tasia-ai/tasia-rust" >> "$GITHUB_STEP_SUMMARY"
-          echo "Requested ref: ${{ inputs.source_ref }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Requested ref: $REQUESTED_SOURCE_REF" >> "$GITHUB_STEP_SUMMARY"
           echo "Checked out SHA: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@v7
         with:
@@ -152,9 +158,11 @@ jobs:
       - name: Record exact source revision
         shell: bash
         working-directory: source
+        env:
+          REQUESTED_SOURCE_REF: ${{ inputs.source_ref }}
         run: |
           echo "Source: tasia-ai/tasia-rust" >> "$GITHUB_STEP_SUMMARY"
-          echo "Requested ref: ${{ inputs.source_ref }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Requested ref: $REQUESTED_SOURCE_REF" >> "$GITHUB_STEP_SUMMARY"
           echo "Checked out SHA: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@v7
         with:
