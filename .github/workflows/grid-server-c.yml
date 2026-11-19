@@ -1,0 +1,154 @@
+name: Grid-Server-C beta builds
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: I-Grid source branch (RemoteSound candidate or integration)
+        type: choice
+        default: fix/remote-sound-ogg
+        options:
+          - fix/remote-sound-ogg
+          - integration/tranquillity-v1.1.2-win11-pgsql
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Grid-Server-C (${{ matrix.rid }})
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            extension: zip
+          - os: ubuntu-24.04
+            rid: linux-x64
+            extension: tar.gz
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout trusted I-Grid source
+        uses: actions/checkout@v5
+        with:
+          repository: tasia-ai/igrid_future
+          ref: ${{ inputs.source_ref }}
+          token: ${{ secrets.TASIA_SOURCE_READ_TOKEN }}
+          persist-credentials: false
+          fetch-depth: 0
+          path: source
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v5
+        with:
+          global-json-file: source/global.json
+
+      - name: Build solution
+        working-directory: source
+        run: |
+          dotnet build Tranquillity.sln -c Release -p:PlatformTarget=x64
+          if ($LASTEXITCODE -ne 0) { throw 'Solution build failed' }
+
+      - name: Offline framework and baking tests
+        working-directory: source
+        run: |
+          $projects = @(
+            'Tests/OpenSim.Framework.Tests/OpenSim.Framework.Tests.csproj',
+            'Tests/OpenSim.Region.OptionalModules.ServerSideBaking.Tests/OpenSim.Region.OptionalModules.ServerSideBaking.Tests.csproj',
+            'Tests/OpenSim.Framework.Servers.Tests/OpenSim.Framework.Servers.Tests.csproj'
+          )
+          foreach ($project in $projects) {
+            dotnet test $project -c Release -p:PlatformTarget=x64
+            if ($LASTEXITCODE -ne 0) { throw "Tests failed: $project" }
+          }
+
+      - name: Publish self-contained server bundles
+        working-directory: source
+        env:
+          RID: ${{ matrix.rid }}
+        run: |
+          $root = Join-Path $env:GITHUB_WORKSPACE "Grid-Server-C-$env:RID"
+          foreach ($name in @('GridServer', 'RegionServer')) {
+            $project = "Source/OpenSim.Server.$name/OpenSim.Server.$name.csproj"
+            dotnet publish $project -c Release -r $env:RID --self-contained true -p:PlatformTarget=x64 -o (Join-Path $root $name)
+            if ($LASTEXITCODE -ne 0) { throw "Publish failed: $name" }
+          }
+          $sha = (git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot identify source commit' }
+          $sha | Set-Content (Join-Path $root 'SOURCE-COMMIT.txt')
+          Copy-Item Docs/BUILDING.md (Join-Path $root 'BUILDING.md')
+          if (Test-Path Docs/remote-sound-url.md) {
+            Copy-Item Docs/remote-sound-url.md $root
+          }
+
+      - name: Verify published server and addon assemblies
+        env:
+          RID: ${{ matrix.rid }}
+        run: |
+          $root = Join-Path $env:GITHUB_WORKSPACE "Grid-Server-C-$env:RID"
+          $region = Join-Path $root 'RegionServer'
+          $grid = Join-Path $root 'GridServer'
+          $addons = @(
+            'Abstractions', 'AbuseReports', 'AccessLogger', 'AlertNotifications',
+            'ChatAudit', 'DisplayNameCaps', 'FriendConference', 'JoinApi',
+            'LoginSecurity', 'MACAudit', 'Marketplace', 'MetricsConnector',
+            'Quic', 'RemoteSound', 'RestartModule', 'SharedInventory', 'WoWonder'
+          )
+          $required = @('OpenSim.dll', 'OpenSim.Data.PGSQL.dll', 'Npgsql.dll')
+          $required += $addons | ForEach-Object { "TasiaAddons.$_.dll" }
+          foreach ($file in $required) {
+            if (!(Test-Path (Join-Path $region $file) -PathType Leaf)) { throw "Region package missing $file" }
+          }
+          foreach ($file in @('OpenSim.Server.GridServer.dll', 'OpenSim.Data.PGSQL.dll', 'Npgsql.dll',
+                              'TasiaAddons.Quic.dll', 'TasiaAddons.InternalScriptRpc.dll', 'TasiaAddons.GridFunctions.dll')) {
+            if (!(Test-Path (Join-Path $grid $file) -PathType Leaf)) { throw "Grid package missing $file" }
+          }
+          $launcher = if ($env:RID -eq 'win-x64') { 'OpenSim.exe' } else { 'OpenSim' }
+          if (!(Test-Path (Join-Path $region $launcher) -PathType Leaf)) { throw "Missing region launcher $launcher" }
+          $gridLauncher = if ($env:RID -eq 'win-x64') { 'OpenSim.Server.GridServer.exe' } else { 'OpenSim.Server.GridServer' }
+          if (!(Test-Path (Join-Path $grid $gridLauncher) -PathType Leaf)) { throw "Missing grid launcher $gridLauncher" }
+
+      - name: Archive and checksum
+        env:
+          RID: ${{ matrix.rid }}
+          EXTENSION: ${{ matrix.extension }}
+        run: |
+          $name = "Grid-Server-C-$env:RID"
+          $archive = "$name.$env:EXTENSION"
+          if ($env:RID -eq 'win-x64') {
+            tar.exe -a -cf $archive $name
+          } else {
+            tar -czf $archive $name
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'Archive failed' }
+          $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  $archive" | Set-Content -LiteralPath "$archive.sha256" -Encoding utf8NoBOM
+
+      - name: Upload to I-Grid storage
+        shell: bash
+        env:
+          STORAGE_URL: ${{ secrets.STORAGE_URL }}
+          STORAGE_TOKEN: ${{ secrets.STORAGE_TOKEN }}
+          RID: ${{ matrix.rid }}
+          EXTENSION: ${{ matrix.extension }}
+        run: |
+          set -euo pipefail
+          : "${STORAGE_URL:?Missing STORAGE_URL secret}"
+          : "${STORAGE_TOKEN:?Missing STORAGE_TOKEN secret}"
+          [[ "$STORAGE_URL" == https://* ]] || { echo 'Storage must use HTTPS'; exit 1; }
+          archive="Grid-Server-C-$RID.$EXTENSION"
+          for filename in "$archive" "$archive.sha256"; do
+            curl --fail-with-body --silent --show-error --output /dev/null \
+              --connect-timeout 20 --max-time 1800 \
+              -H "Authorization: Bearer $STORAGE_TOKEN" \
+              -H 'X-Storage-Branch: beta' \
+              -H 'X-Storage-Product: Grid-Server-C' \
+              --upload-file "$filename" \
+              "${STORAGE_URL%/}/artifacts/$GITHUB_REPOSITORY/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT/$filename"
+            echo "Uploaded $filename to Grid-Server-C / beta" >> "$GITHUB_STEP_SUMMARY"
+          done
