@@ -5,13 +5,13 @@ on:
     inputs:
       source_ref:
         description: Source branch, tag or commit
-        type: string
-        default: main
         required: true
-      publish:
-        description: Publish approved main build to storage.to
+        type: string
+        default: fix/tasia-profile-marks-foundation
+      upload:
+        description: Upload candidate packages to private test storage (Beta)
         type: boolean
-        default: false
+        default: true
 
 permissions:
   contents: read
@@ -25,10 +25,10 @@ jobs:
         with:
           repository: tasia-ai/tasia-rust
           ref: ${{ inputs.source_ref }}
-          fetch-depth: 0
           token: ${{ secrets.TASIA_SOURCE_READ_TOKEN }}
           persist-credentials: false
           path: source
+          fetch-depth: 0
       - name: Rust stable
         run: rustup update stable --no-self-update
       - uses: actions/setup-python@v6
@@ -41,170 +41,40 @@ jobs:
         shell: pwsh
         run: |
           $exe = 'source/target/release/aurora-viewer.exe'
-          if (-not (Test-Path -LiteralPath $exe)) { $exe = 'source/target/release/tasia-viewer.exe' }
           if (-not (Test-Path -LiteralPath $exe)) { throw 'Viewer executable missing' }
           $dir = 'Tasia-Viewer-windows-x64'
           ./source/scripts/package.ps1 -Exe $exe -Out $dir -Source source
-          if ($exe -like '*/aurora-viewer.exe') {
-            $version = (Get-Content -LiteralPath "$dir/aurora-install.json" -Raw | ConvertFrom-Json).version
-            if ($version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?
-      - name: Upload package to storage.to
-        if: inputs.publish && inputs.source_ref == 'main' && github.ref == 'refs/heads/main'
-        env:
-          STORAGE_TO_TOKEN: ${{ secrets.STORAGE_TO_TOKEN }}
-        run: |
-          python source/scripts/storage_to_upload.py --directory . --output storage-to-urls-windows.json
-          if ($LASTEXITCODE -ne 0) { throw 'storage.to upload failed' }
-          Get-Content storage-to-urls-windows.json | Add-Content $env:GITHUB_STEP_SUMMARY
-
-  linux-x64:
-    name: Linux x64
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          repository: tasia-ai/tasia-rust
-          ref: ${{ inputs.source_ref }}
-          fetch-depth: 0
-          token: ${{ secrets.TASIA_SOURCE_READ_TOKEN }}
-          persist-credentials: false
-          path: source
-      - name: System libraries
-        run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev
-      - name: Rust stable
-        run: rustup update stable --no-self-update
-      - name: Build
-        working-directory: source
-        env:
-          CARGO_PROFILE_RELEASE_STRIP: debuginfo
-        run: cargo build --release --locked -p aurora-viewer
-      - name: Package
-        shell: pwsh
-        run: |
-          $exe = 'source/target/release/aurora-viewer'
-          if (-not (Test-Path -LiteralPath $exe)) { $exe = 'source/target/release/tasia-viewer' }
-          if (-not (Test-Path -LiteralPath $exe)) { throw 'Viewer executable missing' }
-          ./source/scripts/package.ps1 -Exe $exe -Out Tasia-Viewer-linux-x64 -Source source
-          tar -czf Tasia-Viewer-linux-x64.tar.gz Tasia-Viewer-linux-x64
-          sha256sum Tasia-Viewer-linux-x64.tar.gz > Tasia-Viewer-linux-x64.tar.gz.sha256
-      - name: Upload package to storage.to
-        if: inputs.publish && inputs.source_ref == 'main' && github.ref == 'refs/heads/main'
-        env:
-          STORAGE_TO_TOKEN: ${{ secrets.STORAGE_TO_TOKEN }}
-        run: |
-          python3 source/scripts/storage_to_upload.py --directory . --output storage-to-urls-linux.json
-          cat storage-to-urls-linux.json >> "$GITHUB_STEP_SUMMARY"
-
-  macos-x64:
-    name: macOS x64
-    runs-on: macos-15-intel
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          repository: tasia-ai/tasia-rust
-          ref: ${{ inputs.source_ref }}
-          fetch-depth: 0
-          token: ${{ secrets.TASIA_SOURCE_READ_TOKEN }}
-          persist-credentials: false
-          path: source
-      - uses: actions/checkout@v7
-        with:
-          repository: tasia-ai/tasia-playground
-          ref: main
-          persist-credentials: false
-          path: playground
-      - name: Rust stable and target
-        run: rustup update stable --no-self-update && rustup target add x86_64-apple-darwin
-      - name: Build
-        working-directory: source
-        env:
-          CARGO_PROFILE_RELEASE_STRIP: debuginfo
-        run: cargo build --release --locked --target x86_64-apple-darwin -p aurora-viewer
-      - name: Package app
-        shell: bash
-        run: |
-          set -euo pipefail
-          exe=source/target/x86_64-apple-darwin/release/aurora-viewer
-          if [[ -f "$exe" ]]; then
-            pwsh -NoProfile -File source/scripts/package-macos.ps1 -Exe "$exe" -Out "Tasia Viewer.app"
-            codesign --force --sign - "Tasia Viewer.app"
-            codesign --verify --strict "Tasia Viewer.app"
-            ditto -c -k --keepParent "Tasia Viewer.app" Tasia-Viewer-macos-x64.zip
-          else
-            bash ./playground/scripts/package-macos-playground.sh x86_64-apple-darwin x64
-          fi
-          shasum -a 256 Tasia-Viewer-macos-x64.zip > Tasia-Viewer-macos-x64.zip.sha256
-      - name: Upload package to storage.to
-        if: inputs.publish && inputs.source_ref == 'main' && github.ref == 'refs/heads/main'
-        env:
-          STORAGE_TO_TOKEN: ${{ secrets.STORAGE_TO_TOKEN }}
-        run: |
-          python3 source/scripts/storage_to_upload.py --directory . --output storage-to-urls-macos-x64.json
-          cat storage-to-urls-macos-x64.json >> "$GITHUB_STEP_SUMMARY"
-
-  macos-arm64:
-    name: macOS arm64
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          repository: tasia-ai/tasia-rust
-          ref: ${{ inputs.source_ref }}
-          fetch-depth: 0
-          token: ${{ secrets.TASIA_SOURCE_READ_TOKEN }}
-          persist-credentials: false
-          path: source
-      - uses: actions/checkout@v7
-        with:
-          repository: tasia-ai/tasia-playground
-          ref: main
-          persist-credentials: false
-          path: playground
-      - name: Rust stable and target
-        run: rustup update stable --no-self-update && rustup target add aarch64-apple-darwin
-      - name: Build
-        working-directory: source
-        env:
-          CARGO_PROFILE_RELEASE_STRIP: debuginfo
-        run: cargo build --release --locked --target aarch64-apple-darwin -p aurora-viewer
-      - name: Package app
-        shell: bash
-        run: |
-          set -euo pipefail
-          exe=source/target/aarch64-apple-darwin/release/aurora-viewer
-          if [[ -f "$exe" ]]; then
-            pwsh -NoProfile -File source/scripts/package-macos.ps1 -Exe "$exe" -Out "Tasia Viewer.app"
-            codesign --force --sign - "Tasia Viewer.app"
-            codesign --verify --strict "Tasia Viewer.app"
-            ditto -c -k --keepParent "Tasia Viewer.app" Tasia-Viewer-macos-arm64.zip
-          else
-            bash ./playground/scripts/package-macos-playground.sh aarch64-apple-darwin arm64
-          fi
-          shasum -a 256 Tasia-Viewer-macos-arm64.zip > Tasia-Viewer-macos-arm64.zip.sha256
-      - name: Upload package to storage.to
-        if: inputs.publish && inputs.source_ref == 'main' && github.ref == 'refs/heads/main'
-        env:
-          STORAGE_TO_TOKEN: ${{ secrets.STORAGE_TO_TOKEN }}
-        run: |
-          python3 source/scripts/storage_to_upload.py --directory . --output storage-to-urls-macos-arm64.json
-          cat storage-to-urls-macos-arm64.json >> "$GITHUB_STEP_SUMMARY"
-) { throw 'Invalid package version' }
-            $newDir = "Tasia-Viewer-v$version-windows-x64"
-            Rename-Item -LiteralPath $dir -NewName $newDir
-            $dir = $newDir
-          }
-          $archive = "$dir.zip"
-          Compress-Archive -Path $dir -DestinationPath $archive
+          $version = (Get-Content -LiteralPath "$dir/aurora-install.json" -Raw | ConvertFrom-Json).version
+          if ($version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$') { throw 'Invalid package version' }
+          $newDir = "Tasia-Viewer-v$version-windows-x64"
+          Rename-Item -LiteralPath $dir -NewName $newDir
+          $archive = "$newDir.zip"
+          Compress-Archive -Path $newDir -DestinationPath $archive
           $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
           "$hash  $archive" | Set-Content -LiteralPath "$archive.sha256" -Encoding utf8NoBOM
-      - name: Upload package to storage.to
-        if: inputs.publish && inputs.source_ref == 'main' && github.ref == 'refs/heads/main'
+      - name: Upload candidate to Tasia test storage
+        if: inputs.upload
+        shell: bash
         env:
-          STORAGE_TO_TOKEN: ${{ secrets.STORAGE_TO_TOKEN }}
+          STORAGE_URL: ${{ secrets.STORAGE_URL }}
+          STORAGE_TOKEN: ${{ secrets.STORAGE_TOKEN }}
         run: |
-          python source/scripts/storage_to_upload.py --directory . --output storage-to-urls-windows.json
-          if ($LASTEXITCODE -ne 0) { throw 'storage.to upload failed' }
-          Get-Content storage-to-urls-windows.json | Add-Content $env:GITHUB_STEP_SUMMARY
+          set -euo pipefail
+          : "${STORAGE_URL:?Missing STORAGE_URL}"
+          : "${STORAGE_TOKEN:?Missing STORAGE_TOKEN}"
+          [[ "$STORAGE_URL" == https://* ]] || { echo 'Storage must use HTTPS'; exit 1; }
+          shopt -s nullglob
+          files=(Tasia-Viewer-*.zip Tasia-Viewer-*.tar.gz Tasia-Viewer-*.sha256)
+          (( ${#files[@]} >= 2 )) || { echo 'Package or checksum missing'; exit 1; }
+          for file in "${files[@]}"; do
+            curl --fail-with-body --silent --show-error \
+              -H "Authorization: Bearer $STORAGE_TOKEN" \
+              -H "X-Storage-Branch: beta" \
+              -H "X-Storage-Product: Tasiaviewer" \
+              --upload-file "$file" \
+              "${STORAGE_URL%/}/artifacts/$GITHUB_REPOSITORY/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT/$file" > /dev/null
+            printf 'Uploaded candidate: %s\n' "$file" >> "$GITHUB_STEP_SUMMARY"
+          done
 
   linux-x64:
     name: Linux x64
@@ -214,10 +84,10 @@ jobs:
         with:
           repository: tasia-ai/tasia-rust
           ref: ${{ inputs.source_ref }}
-          fetch-depth: 0
           token: ${{ secrets.TASIA_SOURCE_READ_TOKEN }}
           persist-credentials: false
           path: source
+          fetch-depth: 0
       - name: System libraries
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev
       - name: Rust stable
@@ -230,19 +100,32 @@ jobs:
       - name: Package
         shell: pwsh
         run: |
-          $exe = 'source/target/release/aurora-viewer'
-          if (-not (Test-Path -LiteralPath $exe)) { $exe = 'source/target/release/tasia-viewer' }
-          if (-not (Test-Path -LiteralPath $exe)) { throw 'Viewer executable missing' }
-          ./source/scripts/package.ps1 -Exe $exe -Out Tasia-Viewer-linux-x64 -Source source
+          ./source/scripts/package.ps1 -Exe source/target/release/aurora-viewer -Out Tasia-Viewer-linux-x64 -Source source
           tar -czf Tasia-Viewer-linux-x64.tar.gz Tasia-Viewer-linux-x64
           sha256sum Tasia-Viewer-linux-x64.tar.gz > Tasia-Viewer-linux-x64.tar.gz.sha256
-      - name: Upload package to storage.to
-        if: inputs.publish && inputs.source_ref == 'main' && github.ref == 'refs/heads/main'
+      - name: Upload candidate to Tasia test storage
+        if: inputs.upload
+        shell: bash
         env:
-          STORAGE_TO_TOKEN: ${{ secrets.STORAGE_TO_TOKEN }}
+          STORAGE_URL: ${{ secrets.STORAGE_URL }}
+          STORAGE_TOKEN: ${{ secrets.STORAGE_TOKEN }}
         run: |
-          python3 source/scripts/storage_to_upload.py --directory . --output storage-to-urls-linux.json
-          cat storage-to-urls-linux.json >> "$GITHUB_STEP_SUMMARY"
+          set -euo pipefail
+          : "${STORAGE_URL:?Missing STORAGE_URL}"
+          : "${STORAGE_TOKEN:?Missing STORAGE_TOKEN}"
+          [[ "$STORAGE_URL" == https://* ]] || { echo 'Storage must use HTTPS'; exit 1; }
+          shopt -s nullglob
+          files=(Tasia-Viewer-*.zip Tasia-Viewer-*.tar.gz Tasia-Viewer-*.sha256)
+          (( ${#files[@]} >= 2 )) || { echo 'Package or checksum missing'; exit 1; }
+          for file in "${files[@]}"; do
+            curl --fail-with-body --silent --show-error \
+              -H "Authorization: Bearer $STORAGE_TOKEN" \
+              -H "X-Storage-Branch: beta" \
+              -H "X-Storage-Product: Tasiaviewer" \
+              --upload-file "$file" \
+              "${STORAGE_URL%/}/artifacts/$GITHUB_REPOSITORY/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT/$file" > /dev/null
+            printf 'Uploaded candidate: %s\n' "$file" >> "$GITHUB_STEP_SUMMARY"
+          done
 
   macos-x64:
     name: macOS x64
@@ -252,10 +135,10 @@ jobs:
         with:
           repository: tasia-ai/tasia-rust
           ref: ${{ inputs.source_ref }}
-          fetch-depth: 0
           token: ${{ secrets.TASIA_SOURCE_READ_TOKEN }}
           persist-credentials: false
           path: source
+          fetch-depth: 0
       - uses: actions/checkout@v7
         with:
           repository: tasia-ai/tasia-playground
@@ -274,22 +157,34 @@ jobs:
         run: |
           set -euo pipefail
           exe=source/target/x86_64-apple-darwin/release/aurora-viewer
-          if [[ -f "$exe" ]]; then
-            pwsh -NoProfile -File source/scripts/package-macos.ps1 -Exe "$exe" -Out "Tasia Viewer.app"
-            codesign --force --sign - "Tasia Viewer.app"
-            codesign --verify --strict "Tasia Viewer.app"
-            ditto -c -k --keepParent "Tasia Viewer.app" Tasia-Viewer-macos-x64.zip
-          else
-            bash ./playground/scripts/package-macos-playground.sh x86_64-apple-darwin x64
-          fi
+          pwsh -NoProfile -File source/scripts/package-macos.ps1 -Exe "$exe" -Out "Tasia Viewer.app" -Source source
+          codesign --force --sign - "Tasia Viewer.app"
+          codesign --verify --strict "Tasia Viewer.app"
+          ditto -c -k --keepParent "Tasia Viewer.app" Tasia-Viewer-macos-x64.zip
           shasum -a 256 Tasia-Viewer-macos-x64.zip > Tasia-Viewer-macos-x64.zip.sha256
-      - name: Upload package to storage.to
-        if: inputs.publish && inputs.source_ref == 'main' && github.ref == 'refs/heads/main'
+      - name: Upload candidate to Tasia test storage
+        if: inputs.upload
+        shell: bash
         env:
-          STORAGE_TO_TOKEN: ${{ secrets.STORAGE_TO_TOKEN }}
+          STORAGE_URL: ${{ secrets.STORAGE_URL }}
+          STORAGE_TOKEN: ${{ secrets.STORAGE_TOKEN }}
         run: |
-          python3 source/scripts/storage_to_upload.py --directory . --output storage-to-urls-macos-x64.json
-          cat storage-to-urls-macos-x64.json >> "$GITHUB_STEP_SUMMARY"
+          set -euo pipefail
+          : "${STORAGE_URL:?Missing STORAGE_URL}"
+          : "${STORAGE_TOKEN:?Missing STORAGE_TOKEN}"
+          [[ "$STORAGE_URL" == https://* ]] || { echo 'Storage must use HTTPS'; exit 1; }
+          shopt -s nullglob
+          files=(Tasia-Viewer-*.zip Tasia-Viewer-*.tar.gz Tasia-Viewer-*.sha256)
+          (( ${#files[@]} >= 2 )) || { echo 'Package or checksum missing'; exit 1; }
+          for file in "${files[@]}"; do
+            curl --fail-with-body --silent --show-error \
+              -H "Authorization: Bearer $STORAGE_TOKEN" \
+              -H "X-Storage-Branch: beta" \
+              -H "X-Storage-Product: Tasiaviewer" \
+              --upload-file "$file" \
+              "${STORAGE_URL%/}/artifacts/$GITHUB_REPOSITORY/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT/$file" > /dev/null
+            printf 'Uploaded candidate: %s\n' "$file" >> "$GITHUB_STEP_SUMMARY"
+          done
 
   macos-arm64:
     name: macOS arm64
@@ -299,10 +194,10 @@ jobs:
         with:
           repository: tasia-ai/tasia-rust
           ref: ${{ inputs.source_ref }}
-          fetch-depth: 0
           token: ${{ secrets.TASIA_SOURCE_READ_TOKEN }}
           persist-credentials: false
           path: source
+          fetch-depth: 0
       - uses: actions/checkout@v7
         with:
           repository: tasia-ai/tasia-playground
@@ -321,19 +216,32 @@ jobs:
         run: |
           set -euo pipefail
           exe=source/target/aarch64-apple-darwin/release/aurora-viewer
-          if [[ -f "$exe" ]]; then
-            pwsh -NoProfile -File source/scripts/package-macos.ps1 -Exe "$exe" -Out "Tasia Viewer.app"
-            codesign --force --sign - "Tasia Viewer.app"
-            codesign --verify --strict "Tasia Viewer.app"
-            ditto -c -k --keepParent "Tasia Viewer.app" Tasia-Viewer-macos-arm64.zip
-          else
-            bash ./playground/scripts/package-macos-playground.sh aarch64-apple-darwin arm64
-          fi
+          pwsh -NoProfile -File source/scripts/package-macos.ps1 -Exe "$exe" -Out "Tasia Viewer.app" -Source source
+          codesign --force --sign - "Tasia Viewer.app"
+          codesign --verify --strict "Tasia Viewer.app"
+          ditto -c -k --keepParent "Tasia Viewer.app" Tasia-Viewer-macos-arm64.zip
           shasum -a 256 Tasia-Viewer-macos-arm64.zip > Tasia-Viewer-macos-arm64.zip.sha256
-      - name: Upload package to storage.to
-        if: inputs.publish && inputs.source_ref == 'main' && github.ref == 'refs/heads/main'
+      - name: Upload candidate to Tasia test storage
+        if: inputs.upload
+        shell: bash
         env:
-          STORAGE_TO_TOKEN: ${{ secrets.STORAGE_TO_TOKEN }}
+          STORAGE_URL: ${{ secrets.STORAGE_URL }}
+          STORAGE_TOKEN: ${{ secrets.STORAGE_TOKEN }}
         run: |
-          python3 source/scripts/storage_to_upload.py --directory . --output storage-to-urls-macos-arm64.json
-          cat storage-to-urls-macos-arm64.json >> "$GITHUB_STEP_SUMMARY"
+          set -euo pipefail
+          : "${STORAGE_URL:?Missing STORAGE_URL}"
+          : "${STORAGE_TOKEN:?Missing STORAGE_TOKEN}"
+          [[ "$STORAGE_URL" == https://* ]] || { echo 'Storage must use HTTPS'; exit 1; }
+          shopt -s nullglob
+          files=(Tasia-Viewer-*.zip Tasia-Viewer-*.tar.gz Tasia-Viewer-*.sha256)
+          (( ${#files[@]} >= 2 )) || { echo 'Package or checksum missing'; exit 1; }
+          for file in "${files[@]}"; do
+            curl --fail-with-body --silent --show-error \
+              -H "Authorization: Bearer $STORAGE_TOKEN" \
+              -H "X-Storage-Branch: beta" \
+              -H "X-Storage-Product: Tasiaviewer" \
+              --upload-file "$file" \
+              "${STORAGE_URL%/}/artifacts/$GITHUB_REPOSITORY/$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT/$file" > /dev/null
+            printf 'Uploaded candidate: %s\n' "$file" >> "$GITHUB_STEP_SUMMARY"
+          done
+
