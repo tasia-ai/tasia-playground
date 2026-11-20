@@ -7,7 +7,7 @@ on:
         description: Source branch, tag or commit
         required: true
         type: string
-        default: dd2a4d576fe6526d6f239fd62a32dec0d169f465
+        default: d7a40119935f6c76849c24931ae7d6870d7277b2
       upload:
         description: Upload candidate packages to private test storage (Beta)
         type: boolean
